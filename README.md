@@ -1,7 +1,24 @@
 # Stable Diffusion WebUI Aspect Ratio selector
 
-Extension for [AUTOMATIC1111/stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui.git) adding image aspect ratio selector buttons.
+Extension for [stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui.git) and [stable-diffusion-webui-forge](https://github.com/lllyasviel/stable-diffusion-webui-forge) adding image aspect ratio selector buttons.
 
+---
+
+# Main Fork feature
+
+<img width="938" alt="Screenshot 2024-03-13 111328" src="https://github.com/altoiddealer/--sd-webui-ar-plusplus/assets/1613484/67bfba6d-ba08-4a7a-b34f-03fe266bf9d8">
+
+### Uses an enhanced method to calculate the width/height values when clicking Aspect Ratio buttons.
+
+- Gets the mean value (average) of the current **width** and **height** values in the UI.
+- For the selected aspect ratio, the dimensions are offset equally (positively and negatively) from the average, ensuring nearest total pixel count to user's initial resolution.
+- Uses the same precision rounding method as [Stability-AI/StableSwarmUI](https://github.com/Stability-AI/StableSwarmUI/blob/4ef98019fc4796d69f0d1d2dfa487d684a748cc3/src/Utils/Utilities.cs#L573) when updating image dimensions.
+
+### For ideal and consistent results, first click a static 1:1 resolution value (such as 1024 x 1024, 512 x 512, etc)
+
+---
+
+# Details from [the source repo](https://github.com/LEv145/--sd-webui-ar-plus) (LEv145/--sd-webui-ar-plus)
 
 ## Fork features
 
@@ -14,8 +31,6 @@ Extension for [AUTOMATIC1111/stable-diffusion-webui](https://github.com/AUTOMATI
 - Better ratios presets (From [wikipedia](https://en.wikipedia.org/wiki/Aspect_ratio_(image)))
 - Rename `Calc` button to `📐`
 - Can work together with the original extension
-
-![img](https://media.discordapp.net/attachments/1124020774055981108/1125719548587417630/image.png)
 
 
 ## Updates
