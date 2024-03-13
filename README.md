@@ -16,6 +16,9 @@ Extension for [stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-d
 
 ### For ideal and consistent results, first click a static 1:1 resolution value (such as 1024 x 1024, 512 x 512, etc)
 
+- The calculation method works correctly in all cases
+- However, since the output values are rounded to the nearest division of 64, the mean value (average) of the input values will often change.
+
 ---
 
 # Details from [the source repo](https://github.com/LEv145/--sd-webui-ar-plus) (LEv145/--sd-webui-ar-plus)
