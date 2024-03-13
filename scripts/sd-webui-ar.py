@@ -6,7 +6,8 @@ import gradio as gr
 import modules.scripts as scripts
 from modules.ui_components import ToolButton
 
-from math import gcd
+from fractions import Fraction
+from math import gcd, sqrt
 
 BASE_PATH = scripts.basedir()
 CALCULATOR_SYMBOL = "\U0001F4D0"  # 📐
@@ -30,38 +31,42 @@ class ResButton(ToolButton):
         return [self.w, self.h]
 
 
+# Helper functions for calculating new width/height from aspect ratio
+def round_to_precision(val, prec):
+    return round(val / prec) * prec
+
+def res_to_model_fit(w, h, mp_target):
+    mp = w * h
+    scale = sqrt(mp_target / mp)
+    w = int(round_to_precision(w * scale, 64))
+    h = int(round_to_precision(h * scale, 64))
+    return w, h
+
+def dims_from_ar(avg, ar):
+    mp_target = avg*avg
+    doubleavg = avg*2
+
+    ar_parts = tuple(map(Fraction, ar.split(':')))
+    ar_sum = ar_parts[0]+ar_parts[1]
+    # calculate width and height by factoring average with aspect ratio
+    w = round((ar_parts[0]/ar_sum)*doubleavg)
+    h = round((ar_parts[1]/ar_sum)*doubleavg)
+    # Round to correct megapixel precision
+    w, h = res_to_model_fit(w, h, mp_target)
+    return w, h
+
+
 class ARButton(ToolButton):
-    def __init__(self, ar=1.0, **kwargs):
+    def __init__(self, ar='1/1', **kwargs):
         super().__init__(**kwargs)
 
         self.ar = ar
 
     def apply(self, w, h):
-        if is_reverse_logic_mode:
-            w, h = self._reverse_calculate_sides(w, h)
-        else:
-            w, h = self._calculate_sides(w, h)
+        avg = (w + h) // 2
+        if (w + h) % 2 != 0: avg += 1
+        w, h = dims_from_ar(avg, self.ar)
         return list(map(round, [w, h]))
-
-    def _reverse_calculate_sides(self, w, h):
-        if self.ar > 1.0:
-            h = w / self.ar
-        elif self.ar < 1.0:
-            w = h * self.ar
-        else:
-            new_value = max([w, h])
-            w, h = new_value, new_value
-        return w, h
-
-    def _calculate_sides(self, w, h):
-        if self.ar > 1.0:
-            w = h * self.ar
-        elif self.ar < 1.0:
-            h = w / self.ar
-        else:
-            new_value = min([w, h])
-            w, h = new_value, new_value
-        return w, h
 
     def reset(self, w, h):
         return [self.res, self.res]
@@ -259,7 +264,7 @@ class AspectRatioScript(scripts.Script):
 
                 # Aspect Ratio buttons
                 ar_btns = [
-                    ARButton(ar=ar, value=label)
+                    ARButton(ar=label, value=label)
                     for ar, label in zip(
                         self.aspect_ratios,
                         self.aspect_ratio_labels,
