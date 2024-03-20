@@ -1,33 +1,61 @@
-# Stable Diffusion WebUI Aspect Ratio selector
+# Stable Diffusion WebUI Aspect Ratio and Resolution Buttons
 
 Extension for [stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui.git) and [stable-diffusion-webui-forge](https://github.com/lllyasviel/stable-diffusion-webui-forge) adding image aspect ratio selector buttons.
 
 ---
 
-# Main Fork feature
+## Main Fork feature
 
 <img width="938" alt="Screenshot 2024-03-13 111328" src="https://github.com/altoiddealer/--sd-webui-ar-plusplus/assets/1613484/67bfba6d-ba08-4a7a-b34f-03fe266bf9d8">
 
-### Uses an enhanced method to calculate the width/height values when clicking Aspect Ratio buttons.
+#### Uses an enhanced method to calculate the width/height values when clicking Aspect Ratio buttons.
 
 - Gets the mean value (average) of the current **width** and **height** values in the UI.
+  
 - For the selected aspect ratio, the dimensions are offset equally (positively and negatively) from the average, ensuring nearest total pixel count to user's initial resolution.
+  
 - Uses the same precision rounding method as [Stability-AI/StableSwarmUI](https://github.com/Stability-AI/StableSwarmUI/blob/4ef98019fc4796d69f0d1d2dfa487d684a748cc3/src/Utils/Utilities.cs#L573) when updating image dimensions.
+  
+- "Mode" button allows switching to use calculation method from [LEv145/--sd-webui-ar-plus](https://github.com/LEv145/--sd-webui-ar-plus) (Only update Width OR Height)
 
-### For best results switching between aspect ratios, pick a static res value (such as 1024, etc), then press the "Lock" button to lock in an average res.
+#### For best results switching between aspect ratios, pick a static res value (such as 1024, etc), then press the "Lock" button to lock in an average res.
 
 - The calculation method works correctly in all cases
+  
 - However, since the output values are rounded to the nearest division of 64, the mean value (average) of the input values will change when "Unlocked".
 
-### The original hidden "Calculator panel" has been replaced with an information panel:
+#### The original "Calculator panel" has been replaced with an information panel:
 
 - Current average is displayed for reference.
 
-- Rounding precision can be adjusted as well, with default value of 64px.
+- Rounding precision can be adjusted with default value of 64px.
+
+## Installation
+
+1. Navigate to the Extensions tab in [stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui.git) or [stable-diffusion-webui-forge](https://github.com/lllyasviel/stable-diffusion-webui-forge)
+
+2. Click "Install from URL"
+   
+3. Copy/Paste this repository into the "URL for extension's git repository" field and click "Install"
+   ```
+   https://github.com/altoiddealer/--sd-webui-ar-plusplus
+   ```
+   
+   <img width="895" alt="install" src="https://github.com/altoiddealer/--sd-webui-ar-plusplus/assets/1613484/21b0ab04-2760-4c91-862e-7b71c7f08feb">
+
+   
+4. Return to the "Installed" tab and click "Apply and restart UI"
+
+  <img width="877" alt="Restart" src="https://github.com/altoiddealer/--sd-webui-ar-plusplus/assets/1613484/72a5e77e-b8a2-49a1-9d5f-81524bb18a27">
+ 
 
 ---
 
-# Details from [the source repo](https://github.com/LEv145/--sd-webui-ar-plus) (LEv145/--sd-webui-ar-plus)
+<details>
+
+<summary>Details from [the source project (LEv145/--sd-webui-ar-plus)</summary>
+
+# Details from [the source project](https://github.com/LEv145/--sd-webui-ar-plus) (LEv145/--sd-webui-ar-plus)
 
 (For reference - much of this is obsolete)
 
@@ -120,3 +148,5 @@ Use the calculator to determine new width or height values based on the aspect r
 - Click `Apply` to send the values to the txt2txt/img2img sliders
 ---
 <img width="666" style="border: solid 3px black;" alt="Basic usage of aspect ratio calculator" src="https://user-images.githubusercontent.com/121050401/229391634-4ec06027-e603-4672-bad9-ec77647b0941.gif">
+
+</details>
