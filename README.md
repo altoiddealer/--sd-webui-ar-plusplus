@@ -14,14 +14,22 @@ Extension for [stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-d
 - For the selected aspect ratio, the dimensions are offset equally (positively and negatively) from the average, ensuring nearest total pixel count to user's initial resolution.
 - Uses the same precision rounding method as [Stability-AI/StableSwarmUI](https://github.com/Stability-AI/StableSwarmUI/blob/4ef98019fc4796d69f0d1d2dfa487d684a748cc3/src/Utils/Utilities.cs#L573) when updating image dimensions.
 
-### For ideal and consistent results, first click a static 1:1 resolution value (such as 1024 x 1024, 512 x 512, etc)
+### For best results switching between aspect ratios, pick a static res value (such as 1024, etc), then press the "Lock" button to lock in an average res.
 
 - The calculation method works correctly in all cases
-- However, since the output values are rounded to the nearest division of 64, the mean value (average) of the input values will often change.
+- However, since the output values are rounded to the nearest division of 64, the mean value (average) of the input values will change when "Unlocked".
+
+### The original hidden "Calculator panel" has been replaced with an information panel:
+
+- Current average is displayed for reference.
+
+- Rounding precision can be adjusted as well, with default value of 64px.
 
 ---
 
 # Details from [the source repo](https://github.com/LEv145/--sd-webui-ar-plus) (LEv145/--sd-webui-ar-plus)
+
+(For reference - much of this is obsolete)
 
 ## Fork features
 
