@@ -135,6 +135,7 @@ def parse_aspect_ratios_file(filename):
         comment = ""
         if "#" in value:
             value, comment = value.split("#")
+        value = value.strip()
         values.append(value)
         comments.append(comment)
 
@@ -178,7 +179,7 @@ def parse_resolutions_file(filename):
 
 def write_aspect_ratios_file(filename):
     aspect_ratios = [
-        "1:1            # Square\n",   
+        "1:1            # Square\n",
         "4:3            # Television Photography\n",
         "3:2            # Photography\n",
         "8:5            # Widescreen Displays\n",
