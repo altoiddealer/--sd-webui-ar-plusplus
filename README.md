@@ -18,17 +18,31 @@ Extension for [stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-d
   
 - "Mode" button allows switching to use calculation method from [LEv145/--sd-webui-ar-plus](https://github.com/LEv145/--sd-webui-ar-plus) (Only update Width OR Height)
 
+---
+
+<img width="944" alt="1" src="https://github.com/altoiddealer/--sd-webui-ar-plusplus/assets/1613484/87a12aef-76f9-450b-a908-49131078b1dd">
+
+---
+
 #### For best results switching between aspect ratios, pick a static res value (such as 1024, etc), then press the "Lock" button to lock in an average res.
 
 - The calculation method works correctly in all cases
   
 - However, since the output values are rounded to the nearest division of 64, the mean value (average) of the input values will change when "Unlocked".
 
+---
+
+<img width="937" alt="2" src="https://github.com/altoiddealer/--sd-webui-ar-plusplus/assets/1613484/bb124293-289c-4f8c-b2f6-2e7de060f188">
+
+---
+
 #### The original "Calculator panel" has been replaced with an information panel:
 
 - Current average is displayed for reference.
 
 - Rounding precision can be adjusted with default value of 64px.
+
+---
 
 ## Installation
 
