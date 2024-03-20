@@ -20,8 +20,8 @@
 	max-width: unset !important;
 }
 
-button#arsp__arc_show_calculator_button,
-button#arsp__arc_hide_calculator_button,
+button#arsp__arc_show_info_button,
+button#arsp__arc_hide_info_button,
 button#arsp__arc_show_logic_button,
 button#arsp__arc_hide_logic_button {
 	max-width: 40px !important;

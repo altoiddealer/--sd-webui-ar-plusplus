@@ -10,39 +10,30 @@ from fractions import Fraction
 from math import gcd, sqrt
 
 BASE_PATH = scripts.basedir()
-CALCULATOR_SYMBOL = "\U0001F4D0"  # 📐
-SWITCH_VALUES_SYMBOL = "\U000021C5"  # ⇅
-DIMENSIONS_SYMBOL = "\u2B07\ufe0f"  # ⬇️
-IMAGE_DIMENSIONS_SYMBOL = "\U0001F5BC"  # 🖼
-REVERSE_LOGIC_SYMBOL = "\U0001F503"  # 🔃
-ROUND_SYMBOL = "\U0001F50D"  # 🔍
-IMAGE_ROUNDING_MULTIPLIER = 4
+SWITCH_SYMBOL = "\U0001F501"        # 🔁
+LOCK_OPEN_SYMBOL = "\U0001F513"     # 🔓
+LOCK_SYMBOL = "\U0001F512"          # 🔒
+LAND_AR_SYMBOL = "\U000025AD"       # ▭
+PORT_AR_SYMBOL = "\U000025AF"       # ▯
+INFO_SYMBOL = "\U00002139"          # ℹ
 
-is_reverse_logic_mode = False  # FIXME: Global value
+is_lock_mode = False  # FIXME: Global value
+is_switch_mode = False  # FIXME: Global value
+is_locked = False
 
-
-class ResButton(ToolButton):
-    def __init__(self, res=(512, 512), **kwargs):
-        super().__init__(**kwargs)
-
-        self.w, self.h = res
-
-    def reset(self):
-        return [self.w, self.h]
-
-
+## Aspect Ratio buttons
 # Helper functions for calculating new width/height from aspect ratio
 def round_to_precision(val, prec):
     return round(val / prec) * prec
 
-def res_to_model_fit(w, h, mp_target):
+def res_to_model_fit(w, h, mp_target, prec):
     mp = w * h
     scale = sqrt(mp_target / mp)
-    w = int(round_to_precision(w * scale, 64))
-    h = int(round_to_precision(h * scale, 64))
+    w = int(round_to_precision(w * scale, prec))
+    h = int(round_to_precision(h * scale, prec))
     return w, h
 
-def dims_from_ar(avg, ar):
+def dims_from_ar(avg, ar, prec):
     mp_target = avg*avg
     doubleavg = avg*2
 
@@ -52,55 +43,82 @@ def dims_from_ar(avg, ar):
     w = round((ar_parts[0]/ar_sum)*doubleavg)
     h = round((ar_parts[1]/ar_sum)*doubleavg)
     # Round to correct megapixel precision
-    w, h = res_to_model_fit(w, h, mp_target)
+    w, h = res_to_model_fit(w, h, mp_target, prec)
     return w, h
 
+def avg_from_dims(w, h):
+    avg = (w + h) // 2
+    if (w + h) % 2 != 0:
+        avg += 1
+    return avg
 
 class ARButton(ToolButton):
-    def __init__(self, ar='1/1', **kwargs):
+    switched = False
+
+    def __init__(self, value='1:1', **kwargs):
         super().__init__(**kwargs)
+        self.value = value
 
-        self.ar = ar
+    def apply(self, avg, prec, w=512, h=512):
+        # Get average of current width/height values
+        if not is_locked:
+            avg = avg_from_dims(w, h)
+        # Calculate new w/h from avg, AR, and precision
+        w, h = dims_from_ar(avg, self.value, prec)
+        if ARButton.switched:
+            w, h = h, w # return switched results
+        return avg, w, h
 
-    def apply(self, w, h):
-        avg = (w + h) // 2
-        if (w + h) % 2 != 0: avg += 1
-        w, h = dims_from_ar(avg, self.ar)
-        return list(map(round, [w, h]))
+    @classmethod
+    def toggle_switch(cls):
+        cls.switched = not cls.switched
 
-    def reset(self, w, h):
-        return [self.res, self.res]
+## Static Resolution buttons
+class ResButton(ToolButton):
+    def __init__(self, res=(512, 512), **kwargs):
+        super().__init__(**kwargs)
+        self.w, self.h = res
 
+    def reset(self, avg):
+        # Get average of current width/height values
+        if not is_locked:
+            avg = avg_from_dims(self.w, self.h)
+        return avg, self.w, self.h
 
+## Get values for Aspect Ratios from file
 def parse_aspect_ratios_file(filename):
-    labels, values, comments = [], [], []
+    values, flipvals, comments = [], [], []
     file = Path(BASE_PATH, filename)
 
     if not file.exists():
-        return labels, values, comments
+        return values, comments, flipvals
 
     with open(file, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
     if not lines:
-        return labels, values, comments
+        return values, comments, flipvals
 
     for line in lines:
         if line.startswith("#"):
             continue
 
-        label, value = line.strip().split(",")
+        value = line.strip()
+
         comment = ""
         if "#" in value:
             value, comment = value.split("#")
-
-        labels.append(label)
-        values.append(eval(value))
+        values.append(value)
         comments.append(comment)
 
-    return labels, values, comments
+        comp1, comp2 = value.split(':')
+        flipval = f"{comp2}:{comp1}"
+        flipvals.append(flipval)
+
+    return values, comments, flipvals
 
 
+## Get values for Static Resolutions from file
 def parse_resolutions_file(filename):
     labels, values, comments = [], [], []
     file = Path(BASE_PATH, filename)
@@ -131,19 +149,17 @@ def parse_resolutions_file(filename):
 
     return labels, values, comments
 
-
 # TODO: write a generic function handling both cases
 def write_aspect_ratios_file(filename):
     aspect_ratios = [
-        "3:2, 3/2      # Photography\n",
-        "4:3, 4/3      # Television photography\n",
-        "16:9, 16/9    # Television photography\n",
-        "1.85:1, 1.85  # Cinematography\n",
-        "2.39:1, 2.39  # Cinematography",
+        "3:2            # Photography\n",
+        "4:3            # Television photography\n",
+        "16:9           # Television photography\n",
+        "1.85:1         # Cinematography\n",
+        "2.39:1         # Cinematography",
     ]
     with open(filename, "w", encoding="utf-8") as f:
         f.writelines(aspect_ratios)
-
 
 def write_resolutions_file(filename):
     resolutions = [
@@ -156,83 +172,33 @@ def write_resolutions_file(filename):
     with open(filename, "w", encoding="utf-8") as f:
         f.writelines(resolutions)
 
-
 def write_js_titles_file(button_titles):
     filename = Path(BASE_PATH, "javascript", "button_titles.js")
-    content = [
-        "// Do not put custom titles here. This file is overwritten each time the WebUI is started.\n"
-    ]
+    content = ["// Do not put custom titles here. This file is overwritten each time the WebUI is started.\n"]
     content.append("arsp__ar_button_titles = {\n")
     counter = 0
     while counter < len(button_titles[0]):
-        content.append(
-            f'    "{button_titles[0][counter]}" : "{button_titles[1][counter]}",\n'
-        )
+        content.append(f'    " {button_titles[0][counter]}" : "{button_titles[1][counter]}",\n')
         counter = counter + 1
     content.append("}")
 
     with open(filename, "w", encoding="utf-8") as f:
         f.writelines(content)
 
-
-def get_reduced_ratio(n, d):
-    n, d = list(map(int, (n, d)))
-
-    if n == d:
-        return "1:1"
-
-    if n < d:
-        div = gcd(d, n)
-    else:
-        div = gcd(n, d)
-
-    w = int(n) // div
-    h = int(d) // div
-
-    if w == 8 and h == 5:
-        w = 16
-        h = 10
-
-    return f"{w}:{h}"
-
-
-def solve_aspect_ratio(w, h, n, d):
-    if w != 0 and w:
-        return round(w / (n / d))
-    elif h != 0 and h:
-        return round(h * (n / d))
-    else:
-        return 0
-
-
 class AspectRatioScript(scripts.Script):
     def read_aspect_ratios(self):
         ar_file = Path(BASE_PATH, "aspect_ratios.txt")
         if not ar_file.exists():
             write_aspect_ratios_file(ar_file)
-
-        (
-            self.aspect_ratio_labels,
-            aspect_ratios,
-            self.aspect_ratio_comments,
-        ) = parse_aspect_ratios_file("aspect_ratios.txt")
-        self.aspect_ratios = list(map(float, aspect_ratios))
-
-        # TODO: check for duplicates
-
-        # TODO: check for invalid values
-
-        # TODO: use comments as tooltips
-        # see https://github.com/alemelis/sd-webui-ar/issues/5
+        (self.aspect_ratios, self.aspect_ratio_comments, self.flipped_vals) = parse_aspect_ratios_file("aspect_ratios.txt")
+        self.ar_btns_labels = self.aspect_ratios
 
     def read_resolutions(self):
         res_file = Path(BASE_PATH, "resolutions.txt")
         if not res_file.exists():
             write_resolutions_file(res_file)
 
-        self.res_labels, res, self.res_comments = parse_resolutions_file(
-            "resolutions.txt"
-        )
+        self.res_labels, res, self.res_comments = parse_resolutions_file("resolutions.txt")
         self.res = [list(map(int, r)) for r in res]
 
     def title(self):
@@ -242,325 +208,208 @@ class AspectRatioScript(scripts.Script):
         return scripts.AlwaysVisible
 
     def ui(self, is_img2img):
-        with gr.Column(
-            elem_id=f'arsp__{"img" if is_img2img else "txt"}2img_container_aspect_ratio'
-        ):
+        arc_avg = gr.Number(label="Current W/H Avg.", value=0, interactive=False, render=False)
+        arc_prec = gr.Number(label="Precision (px)", info='64px is recommended, the same rounding applied for image "bucketing" when model training.', value=64, minimum=4, maximum=128, precision=0, render=False)
+
+        with gr.Column(elem_id=f'arsp__{"img" if is_img2img else "txt"}2img_container_aspect_ratio'):
+            # Get aspect ratios from file
             self.read_aspect_ratios()
-            with gr.Row(
-                elem_id=f'arsp__{"img" if is_img2img else "txt"}2img_row_aspect_ratio'
-            ):
-                arc_show_logic = ToolButton(
-                    value=REVERSE_LOGIC_SYMBOL,
-                    visible=True,
-                    variant="secondary",
-                    elem_id="arsp__arc_show_logic_button",
-                )
-                arc_hide_logic = ToolButton(
-                    value=REVERSE_LOGIC_SYMBOL,
-                    visible=False,
-                    variant="primary",
-                    elem_id="arsp__arc_hide_logic_button",
-                )
+            # Top row
+            with gr.Row(elem_id=f'arsp__{"img" if is_img2img else "txt"}2img_row_aspect_ratio'):
+
+                # Lock button
+                arc_show_lock = ToolButton(value=LOCK_SYMBOL, min_width=84, scale = 0, visible=True, variant="secondary", elem_id="arsp__arc_show_lock_button")
+                arc_hide_lock = ToolButton(value=LOCK_SYMBOL, min_width=84, scale = 0, visible=False, variant="primary", elem_id="arsp__arc_hide_lock_button")
+                # Click event handling for lock button
+                def toggle_lock(avg, w=512, h=512):
+                    global is_locked
+                    is_locked = not is_locked
+                    if not avg:
+                        avg = avg_from_dims(w, h)
+                    return avg
+                if is_img2img:
+                    lock_w = self.i2i_w
+                    lock_h = self.i2i_h
+                else:
+                    lock_w = self.t2i_w
+                    lock_h = self.t2i_h
+                arc_show_lock.click(toggle_lock, inputs=[arc_avg, lock_w, lock_h], outputs=[arc_avg])
+                arc_hide_lock.click(toggle_lock, inputs=[arc_avg, lock_w, lock_h], outputs=[arc_avg])
+
+                # Switch button
+                arc_sw_on = ToolButton(value=SWITCH_SYMBOL, min_width=84, scale = 0, visible=True, variant="secondary", elem_id="arsp__arc_sw_on_button")
+                arc_sw_off = ToolButton(value=SWITCH_SYMBOL, min_width=84, scale = 0, visible=False, variant="primary", elem_id="arsp__arc_sw_off_button")
+                # Click event handling for switch button
+                def toggle_switch():
+                    ARButton.toggle_switch()
+                # def toggle_switch():
+                #     if self.ar_btns_labels == self.aspect_ratios:
+                #         self.ar_btns_labels = self.flipped_vals
+                #     else:
+                #         self.ar_btns_labels = self.aspect_ratios
+                arc_sw_on.click(toggle_switch)
+                arc_sw_off.click(toggle_switch)
 
                 # Aspect Ratio buttons
-                ar_btns = [
-                    ARButton(ar=label, value=label)
-                    for ar, label in zip(
-                        self.aspect_ratios,
-                        self.aspect_ratio_labels,
-                    )
-                ]
-
+                ar_btns = [ARButton(value=ar) for ar in self.ar_btns_labels]
+                # Click event handling for AR buttons
                 with contextlib.suppress(AttributeError):
                     for b in ar_btns:
                         if is_img2img:
-                            resolution = [self.i2i_w, self.i2i_h]
+                            w = self.i2i_w
+                            h = self.i2i_h
                         else:
-                            resolution = [self.t2i_w, self.t2i_h]
+                            w = self.t2i_w
+                            h = self.t2i_h  
+                                                  
+                        b.click(b.apply, inputs=[arc_avg, arc_prec, w, h], outputs=[arc_avg, w, h])
 
-                        b.click(
-                            b.apply,
-                            inputs=resolution,
-                            outputs=resolution,
-                        )
-
+            # Get resolutions from file
             self.read_resolutions()
-            with gr.Row(
-                elem_id=f'arsp__{"img" if is_img2img else "txt"}2img_row_resolutions'
-            ):
-                # Toggle calculator display button
-                arc_show_calculator = ToolButton(
-                    value=CALCULATOR_SYMBOL,
-                    visible=True,
-                    variant="secondary",
-                    elem_id="arsp__arc_show_calculator_button",
-                )
-                arc_hide_calculator = ToolButton(
-                    value=CALCULATOR_SYMBOL,
-                    visible=False,
-                    variant="primary",
-                    elem_id="arsp__arc_hide_calculator_button",
-                )
+            # Bottom row
+            with gr.Row(elem_id=f'arsp__{"img" if is_img2img else "txt"}2img_row_resolutions'):
+                # Info button to toggle info window
+                arc_show_info = ToolButton(value=INFO_SYMBOL, min_width=84, scale = 1.0, visible=True, variant="secondary", elem_id="arsp__arc_show_info_button")
+                arc_hide_info = ToolButton(value=INFO_SYMBOL, min_width=84, scale = 1.0, visible=False, variant="primary", elem_id="arsp__arc_hide_info_button")
+                # Click event handling for info window
+                def toggle_info():
+                    arc_panel.visible = not arc_panel.visible
+                    arc_show_info.visible = not arc_show_info.visible
+                    arc_hide_info.visible = not arc_hide_info.visible
 
-                btns = [
-                    ResButton(res=res, value=label)
-                    for res, label in zip(self.res, self.res_labels)
-                ]
+                arc_show_info.click(toggle_info)
+                arc_hide_info.click(toggle_info)
+
+                # Static resolution buttons
+                btns = [ResButton(res=res, value=label) for res, label in zip(self.res, self.res_labels)]
+                # Click event handling for static res buttons
                 with contextlib.suppress(AttributeError):
                     for b in btns:
-                        if is_img2img:
-                            resolution = [self.i2i_w, self.i2i_h]
-                        else:
-                            resolution = [self.t2i_w, self.t2i_h]
-
-                        b.click(
-                            b.reset,
-                            outputs=resolution,
-                        )
+                        b.click(b.reset, inputs=[arc_avg], outputs=[arc_avg, w, h])
 
             # Write button_titles.js with labels and comments read from aspect ratios and resolutions files
-            button_titles = [self.aspect_ratio_labels + self.res_labels]
+            button_titles = [self.aspect_ratios + self.res_labels]
             button_titles.append(self.aspect_ratio_comments + self.res_comments)
             write_js_titles_file(button_titles)
-
-            # dummy components needed for JS function
-            dummy_text1 = gr.Text(visible=False)
-            dummy_text2 = gr.Text(visible=False)
-            dummy_text3 = gr.Text(visible=False)
-            dummy_text4 = gr.Text(visible=False)
-
-            # Aspect Ratio Calculator
-            with gr.Column(
-                visible=False, variant="panel", elem_id="arsp__arc_panel"
-            ) as arc_panel:
-                arc_title_heading = gr.Markdown(value="#### Aspect Ratio Calculator")
+            
+            # Information panel
+            with gr.Column(visible=False, variant="panel", elem_id="arsp__arc_panel") as arc_panel:
                 with gr.Row():
-                    with gr.Column(min_width=150):
-                        arc_width1 = gr.Number(label="Width 1")
-                        arc_height1 = gr.Number(label="Height 1")
+                    with gr.Column(scale=2, min_width=100):
+                        # render the current average number box
+                        arc_avg.render()
 
-                    with gr.Column(min_width=150):
-                        arc_desired_width = gr.Number(label="Width 2")
-                        arc_desired_height = gr.Number(label="Height 2")
+                        # render the precision input box
+                        arc_prec.render()
 
-                    with gr.Column(min_width=150):
-                        arc_ar_display = gr.Markdown(value="Aspect Ratio:", elem_id="arsp__arc_ar_display_text")
-                        with gr.Row(
-                            elem_id=f'arsp__{"img" if is_img2img else "txt"}2img_arc_tool_buttons'
-                        ):
-                            # Switch resolution values button
-                            arc_swap = ToolButton(value=SWITCH_VALUES_SYMBOL)
-                            arc_swap.click(
-                                lambda w, h, w2, h2: (h, w, h2, w2),
-                                inputs=[
-                                    arc_width1,
-                                    arc_height1,
-                                    arc_desired_width,
-                                    arc_desired_height,
-                                ],
-                                outputs=[
-                                    arc_width1,
-                                    arc_height1,
-                                    arc_desired_width,
-                                    arc_desired_height,
-                                ],
-                            )
-                            with contextlib.suppress(AttributeError):
-                                if is_img2img:
-                                    resolution = [self.i2i_w, self.i2i_h]
-                                    arc_get_img2img_dim = ToolButton(
-                                        value=DIMENSIONS_SYMBOL
-                                    )
-                                    arc_get_img2img_dim.click(
-                                        lambda w, h: (w, h),
-                                        inputs=resolution,
-                                        outputs=[arc_width1, arc_height1],
-                                    )
-                                else:
-                                    resolution = [self.t2i_w, self.t2i_h]
-                                    arc_get_txt2img_dim = ToolButton(
-                                        value=DIMENSIONS_SYMBOL
-                                    )
-                                    arc_get_txt2img_dim.click(
-                                        lambda w, h: (w, h),
-                                        inputs=resolution,
-                                        outputs=[arc_width1, arc_height1],
-                                    )
-
-                            arc_round = ToolButton(value=ROUND_SYMBOL)
-
-                            if is_img2img:
-                                with contextlib.suppress(AttributeError):
-                                    # Javascript function to select image element from current img2img tab
-                                    current_tab_image = """
-                                        function current_tab_image(...args) {
-                                            const tab_index = get_img2img_tab_index();
-                                            // Get current tab's image (on Batch tab, use image from img2img tab)
-                                            if (tab_index == 5) {
-                                                image = args[0];
-                                            } else {
-                                                image = args[tab_index];
-                                            }
-                                            // On Inpaint tab, select just the image and drop the mask
-                                            if (tab_index == 2 && image !== null) {
-                                                image = image["image"];
-                                            }
-                                            return [image, null, null, null, null];
-                                        }
-
-                                    """
-
-                                    # Get image dimensions
-                                    def get_dims(
-                                        img: list,
-                                        dummy_text1,
-                                        dummy_text2,
-                                        dummy_text3,
-                                        dummy_text4,
-                                    ):
-                                        if img:
-                                            width = img.size[0]
-                                            height = img.size[1]
-                                            return width, height
-                                        else:
-                                            return 0, 0
-
-                                    # Get image dimensions button
-                                    arc_get_image_dim = ToolButton(
-                                        value=IMAGE_DIMENSIONS_SYMBOL
-                                    )
-                                    arc_get_image_dim.click(
-                                        fn=get_dims,
-                                        inputs=self.image,
-                                        outputs=[arc_width1, arc_height1],
-                                        _js=current_tab_image,
-                                    )
-
-                    # Update aspect ratio display on change
-                    arc_width1.change(
-                        lambda w, h: (f"Aspect Ratio: **{get_reduced_ratio(w,h)}**"),
-                        inputs=[arc_width1, arc_height1],
-                        outputs=[arc_ar_display],
-                    )
-                    arc_height1.change(
-                        lambda w, h: (f"Aspect Ratio: **{get_reduced_ratio(w,h)}**"),
-                        inputs=[arc_width1, arc_height1],
-                        outputs=[arc_ar_display],
-                    )
-
-                with gr.Row():
-                    # Calculate and Apply buttons
-                    arc_calc_height = gr.Button(value="Calculate Height", scale=1)
-                    arc_calc_height.click(
-                        lambda w2, w1, h1: (solve_aspect_ratio(w2, 0, w1, h1)),
-                        inputs=[arc_desired_width, arc_width1, arc_height1],
-                        outputs=[arc_desired_height],
-                    )
-                    arc_calc_width = gr.Button(value="Calculate Width", scale=1)
-                    arc_calc_width.click(
-                        lambda h2, w1, h1: (solve_aspect_ratio(0, h2, w1, h1)),
-                        inputs=[arc_desired_height, arc_width1, arc_height1],
-                        outputs=[arc_desired_width],
-                    )
-                    arc_apply_params = gr.Button(value="Apply")
-                    with contextlib.suppress(AttributeError):
-                        if is_img2img:
-                            resolution = [self.i2i_w, self.i2i_h]
-                        else:
-                            resolution = [self.t2i_w, self.t2i_h]
-
-                        arc_apply_params.click(
-                            lambda w2, h2: (w2, h2),
-                            inputs=[arc_desired_width, arc_desired_height],
-                            outputs=resolution,
+                    # Information blurb
+                    gr.Column(scale=1, min_width=10)
+                    with gr.Column(scale=12):
+                        arc_title_heading = gr.Markdown(value=
+                        '''
+                        ### AR and Static Res buttons can be customized in the 'aspect_ratios.txt' and 'resolutions.txt' files
+                        ### Top Row:
+                        **Aspect Ratio (AR) buttons** - calculate and apply desireable width/height by: (1) Averaging the current width/height in the UI; (2) Offsetting to the exact AR; (3) Rounding to precision.
+                        **Lock button** - captures the current average width/height in the UI. This is good when switching between ARs. When unlocked, the average will change due to rounding.
+                        **Switch button** - toggles between landscape and portrait orientation for ease of use.
+                        ### Bottom Row:
+                        **Static Resolution buttons** - recommended to use 1:1 values for these, to serve as a start point before clicking AR buttons.
+                        **Mode button** will change the method of the AR buttons to calculate only one value, rather than offsetting.
+                        '''
                         )
 
-            def _arc_show_logic_update():
-                global is_reverse_logic_mode
-                is_reverse_logic_mode = not is_reverse_logic_mode
-
-                return [
-                    arc_show_logic.update(visible=False),
-                    arc_hide_logic.update(visible=True),
-                ]
-
-            def _arc_hide_logic_update():
-                global is_reverse_logic_mode
-                is_reverse_logic_mode = not is_reverse_logic_mode
-
-                return [
-                    arc_show_logic.update(visible=True),
-                    arc_hide_logic.update(visible=False),
-                ]
-
-            arc_round.click(
-                lambda w, h: (
-                    round_to_multiple(w, multiple=IMAGE_ROUNDING_MULTIPLIER),
-                    round_to_multiple(h, multiple=IMAGE_ROUNDING_MULTIPLIER),
-                ),
-                inputs=[arc_desired_width, arc_desired_height],
-                outputs=[arc_desired_width, arc_desired_height],
-            )
-
-            # Show calculator pane (and reset number input values)
-            arc_show_calculator.click(
+            # Show info pane
+            arc_show_info.click(
                 lambda: [
                     gr.update(visible=True),
                     gr.update(visible=False),
                     gr.update(visible=True),
-                    gr.update(value=512),
-                    gr.update(value=512),
-                    gr.update(value=0),
-                    gr.update(value=0),
-                    gr.update(value="Aspect Ratio: **1:1**"),
                 ],
                 None,
                 [
                     arc_panel,
-                    arc_show_calculator,
-                    arc_hide_calculator,
-                    arc_width1,
-                    arc_height1,
-                    arc_desired_width,
-                    arc_desired_height,
-                    arc_ar_display,
+                    arc_show_info,
+                    arc_hide_info,
                 ],
             )
-            # Hide calculator pane
-            arc_hide_calculator.click(
+            # Hide info pane
+            arc_hide_info.click(
                 lambda: [
                     gr.update(visible=False),
                     gr.update(visible=True),
                     gr.update(visible=False),
                 ],
                 None,
-                [arc_panel, arc_show_calculator, arc_hide_calculator],
+                [arc_panel, arc_show_info, arc_hide_info],
             )
 
-            arc_show_logic.click(
-                _arc_show_logic_update,
+            def _arc_show_lock_update():
+                global is_lock_mode
+                is_lock_mode = not is_lock_mode
+
+                return [
+                    arc_show_lock.update(visible=False),
+                    arc_hide_lock.update(visible=True),
+                ]
+            def _arc_hide_lock_update():
+                global is_lock_mode
+                is_lock_mode = not is_lock_mode
+
+                return [
+                    arc_show_lock.update(visible=True),
+                    arc_hide_lock.update(visible=False),
+                ]
+
+            arc_show_lock.click(
+                _arc_show_lock_update,
                 None,
-                [arc_show_logic, arc_hide_logic],
+                [arc_show_lock, arc_hide_lock],
             )
-            arc_hide_logic.click(
-                _arc_hide_logic_update,
+            arc_hide_lock.click(
+                _arc_hide_lock_update,
                 None,
-                [arc_show_logic, arc_hide_logic],
+                [arc_show_lock, arc_hide_lock],
             )
 
+            def _arc_sw_on_update():
+                global is_switch_mode
+                is_switch_mode = not is_switch_mode
 
+                return [
+                    arc_sw_on.update(visible=False),
+                    arc_sw_off.update(visible=True),
+                ]
+            def _arc_sw_off_update():
+                global is_switch_mode
+                is_switch_mode = not is_switch_mode
+
+                return [
+                    arc_sw_on.update(visible=True),
+                    arc_sw_off.update(visible=False),
+                ]
+
+            arc_sw_on.click(
+                _arc_sw_on_update,
+                None,
+                [arc_sw_on, arc_sw_off],
+            )
+            arc_sw_off.click(
+                _arc_sw_off_update,
+                None,
+                [arc_sw_on, arc_sw_off],
+            )
+
+    ## Function to update the values in appropriate Width/Height fields
     # https://github.com/AUTOMATIC1111/stable-diffusion-webui/pull/7456#issuecomment-1414465888
     def after_component(self, component, **kwargs):
         if kwargs.get("elem_id") == "txt2img_width":
             self.t2i_w = component
         if kwargs.get("elem_id") == "txt2img_height":
             self.t2i_h = component
-
         if kwargs.get("elem_id") == "img2img_width":
             self.i2i_w = component
         if kwargs.get("elem_id") == "img2img_height":
             self.i2i_h = component
-
         if kwargs.get("elem_id") == "img2img_image":
             self.image = [component]
         if kwargs.get("elem_id") == "img2img_sketch":
@@ -571,7 +420,3 @@ class AspectRatioScript(scripts.Script):
             self.image.append(component)
         if kwargs.get("elem_id") == "img_inpaint_base":
             self.image.append(component)
-
-
-def round_to_multiple(x, multiple):
-    return multiple * round(x / multiple)
