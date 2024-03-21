@@ -11,8 +11,6 @@ from math import gcd, sqrt
 
 BASE_PATH = scripts.basedir()
 
-is_locked = False
-
 # Helper functions for calculating new width/height values
 def round_to_precision(val, prec):
     return round(val / prec) * prec
@@ -69,6 +67,7 @@ def avg_from_dims(w, h):
 
 # Aspect Ratio buttons
 class ARButton(ToolButton):
+    is_locked = False
     switched = False
     alt_mode = False
 
@@ -79,7 +78,7 @@ class ARButton(ToolButton):
     def apply(self, avg, prec, w=512, h=512):
         ar = self.value
         n, d = map(Fraction, ar.split(':'))         # split numerator and denominator
-        if not is_locked:
+        if not ARButton.is_locked:
             avg = avg_from_dims(w, h)               # Get average of current width/height values
         if not ARButton.alt_mode:                           # True = offset, False = One dimension
             w, h = dims_from_ar(avg, n, d, prec)    # Calculate new w + h from avg, AR, and precision
@@ -93,6 +92,10 @@ class ARButton(ToolButton):
         return avg, w, h
 
     @classmethod
+    def toggle_lock(cls):
+        cls.is_locked = not cls.is_locked
+
+    @classmethod
     def toggle_switch(cls):
         cls.switched = not cls.switched
 
@@ -102,15 +105,21 @@ class ARButton(ToolButton):
 
 # Static Resolution buttons
 class ResButton(ToolButton):
+    is_locked = False
+
     def __init__(self, res=(512, 512), **kwargs):
         super().__init__(**kwargs)
         self.w, self.h = res
 
     def reset(self, avg):
         # Get average of current width/height values
-        if not is_locked:
+        if not ResButton.is_locked:
             avg = avg_from_dims(self.w, self.h)
         return avg, self.w, self.h
+
+    @classmethod
+    def toggle_lock(cls):
+        cls.is_locked = not cls.is_locked
 
 # Get values for Aspect Ratios from file
 def parse_aspect_ratios_file(filename):
@@ -263,9 +272,9 @@ class AspectRatioScript(scripts.Script):
                     arc_lock = ToolButton(value=self.LOCK_OPEN_ICON, visible=True, variant="secondary", elem_id="arsp__arc_lock_button")
                     # Click event handling for lock button
                     def toggle_lock(icon, avg, w=512, h=512):
-                        global is_locked
-                        icon = self.LOCK_OPEN_ICON if is_locked else self.LOCK_CLOSED_ICON
-                        is_locked = not is_locked
+                        icon = self.LOCK_OPEN_ICON if ARButton.is_locked else self.LOCK_CLOSED_ICON
+                        ARButton.toggle_lock()
+                        ResButton.toggle_lock()
                         if not avg:
                             avg = avg_from_dims(w, h)
                         return icon, avg
