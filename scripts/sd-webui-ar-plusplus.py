@@ -277,17 +277,29 @@ class AspectRatioScript(scripts.Script):
                         lock_h = self.t2i_h
                     arc_lock.click(toggle_lock, inputs=[arc_lock, arc_avg, lock_w, lock_h], outputs=[arc_lock, arc_avg])
 
+                    # Initialize Aspect Ratio buttons (render=False)
+                    ar_btns = [ARButton(value=ar, render=False) for ar in self.ar_btns_labels]
+
                     # Switch button
                     arc_sw = ToolButton(value=self.LAND_AR_ICON, visible=True, variant="secondary", elem_id="arsp__arc_sw_button")
                     # Click event handling for switch button
-                    def toggle_switch(icon):
-                        icon = self.PORT_AR_ICON if icon == self.LAND_AR_ICON else self.LAND_AR_ICON
+                    def toggle_switch(*items, **kwargs):
+                        ar_icons = items[:-1]
+                        sw_icon = items[-1]  
+                        if ar_icons == tuple(self.aspect_ratios):
+                            ar_icons = tuple(self.flipped_vals)
+                        else:
+                            ar_icons = tuple(self.aspect_ratios)
+                        sw_icon = self.PORT_AR_ICON if sw_icon == self.LAND_AR_ICON else self.LAND_AR_ICON
                         ARButton.toggle_switch()
-                        return icon
-                    arc_sw.click(toggle_switch, inputs=[arc_sw], outputs=[arc_sw])
+                        return (*ar_icons, sw_icon)
 
-                    # Aspect Ratio buttons
-                    ar_btns = [ARButton(value=ar) for ar in self.ar_btns_labels]
+                    arc_sw.click(toggle_switch, inputs=ar_btns+[arc_sw], outputs=ar_btns+[arc_sw])
+
+                    # Render the Aspect Ratio buttons
+                    for b in ar_btns:
+                        b.render()
+
                     # Click event handling for AR buttons
                     with contextlib.suppress(AttributeError):
                         for b in ar_btns:
