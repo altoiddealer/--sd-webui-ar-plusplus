@@ -65,8 +65,11 @@ def avg_from_dims(w, h):
         avg += 1
     return avg
 
-# Aspect Ratio buttons
-class ARButton(ToolButton):
+## Aspect Ratio buttons
+# two subclasses are necessary to properly split behavior among txt2img and img2img tabs
+
+# txt2img AR Buttons
+class txt2imgARButtons(ToolButton):
     is_locked = False
     switched = False
     alt_mode = False
@@ -78,33 +81,71 @@ class ARButton(ToolButton):
     def apply(self, avg, prec, w=512, h=512):
         ar = self.value
         n, d = map(Fraction, ar.split(':'))         # split numerator and denominator
-        if not ARButton.is_locked:
+        if not txt2imgARButtons.is_locked:
             avg = avg_from_dims(w, h)               # Get average of current width/height values
-        if not ARButton.alt_mode:                           # True = offset, False = One dimension
+        if not txt2imgARButtons.alt_mode:           # True = offset, False = One dimension
             w, h = dims_from_ar(avg, n, d, prec)    # Calculate new w + h from avg, AR, and precision
-            if ARButton.switched:                   # Switch results if switch mode active
+            if txt2imgARButtons.switched:           # Switch results if switch mode active
                 w, h = h, w
         else:                                       # Calculate w or h from input, AR, and precision
-            if ARButton.switched:                   # Switch results if switch mode active
+            if txt2imgARButtons.switched:           # Switch results if switch mode active
                 w, h = calc_width(n, d, w, h, prec)     # Modify width
             else:
                 w, h = calc_height(n, d, w, h, prec)    # Modify height
         return avg, w, h
-
+    # Toggle all buttons in subclass
     @classmethod
     def toggle_lock(cls):
         cls.is_locked = not cls.is_locked
-
     @classmethod
     def toggle_switch(cls):
         cls.switched = not cls.switched
-
     @classmethod
     def toggle_mode(cls):
         cls.alt_mode = not cls.alt_mode
 
-# Static Resolution buttons
-class ResButton(ToolButton):
+# img2img AR Buttons
+class img2imgARButtons(ToolButton):
+    is_locked = False
+    switched = False
+    alt_mode = False
+
+    def __init__(self, value='1:1', **kwargs):
+        super().__init__(**kwargs)
+        self.value = value
+
+    def apply(self, avg, prec, w=512, h=512):
+        ar = self.value
+        n, d = map(Fraction, ar.split(':'))
+        if not img2imgARButtons.is_locked:
+            avg = avg_from_dims(w, h)
+        if not img2imgARButtons.alt_mode:
+            w, h = dims_from_ar(avg, n, d, prec)
+            if img2imgARButtons.switched:
+                w, h = h, w
+        else:
+            if img2imgARButtons.switched:
+                w, h = calc_width(n, d, w, h, prec)
+            else:
+                w, h = calc_height(n, d, w, h, prec)
+        return avg, w, h
+    # Toggle all buttons in subclass
+    @classmethod
+    def toggle_lock(cls):
+        cls.is_locked = not cls.is_locked
+    @classmethod
+    def toggle_switch(cls):
+        cls.switched = not cls.switched
+    @classmethod
+    def toggle_mode(cls):
+        cls.alt_mode = not cls.alt_mode
+
+
+## Static Resolution buttons
+# two subclasses are necessary to properly split behavior among txt2img and img2img tabs
+
+# txt2img Static Resolution buttons
+class txt2imgResButtons(ToolButton):
     is_locked = False
 
     def __init__(self, res=(512, 512), **kwargs):
@@ -113,10 +154,28 @@ class ResButton(ToolButton):
 
     def reset(self, avg):
         # Get average of current width/height values
-        if not ResButton.is_locked:
+        if not txt2imgResButtons.is_locked:
             avg = avg_from_dims(self.w, self.h)
         return avg, self.w, self.h
+    # Toggle all buttons in subclass
+    @classmethod
+    def toggle_lock(cls):
+        cls.is_locked = not cls.is_locked
 
+# img2img Static Resolution buttons
+class img2imgResButtons(ToolButton):
+    is_locked = False
+
+    def __init__(self, res=(512, 512), **kwargs):
+        super().__init__(**kwargs)
+        self.w, self.h = res
+
+    def reset(self, avg):
+        # Get average of current width/height values
+        if not img2imgResButtons.is_locked:
+            avg = avg_from_dims(self.w, self.h)
+        return avg, self.w, self.h
+    # Toggle all buttons in subclass
     @classmethod
     def toggle_lock(cls):
         cls.is_locked = not cls.is_locked
@@ -153,7 +212,6 @@ def parse_aspect_ratios_file(filename):
         flipvals.append(flipval)
 
     return values, comments, flipvals
-
 
 # Get values for Static Resolutions from file
 def parse_resolutions_file(filename):
@@ -254,8 +312,11 @@ class AspectRatioScript(scripts.Script):
         self.INFO_CLOSE_ICON = "\U00002BC5"     # ⯅
         self.OFFSET_ICON = "\U00002B83"         # ⮃
         self.ONE_DIM_ICON = "\U00002B85"        # ⮅
-
+        
+        # Average number box initialize without rendering
         arc_avg = gr.Number(label="Current W/H Avg.", value=0, interactive=False, render=False)
+
+        # Precision input box initialize without rendering
         arc_prec = gr.Number(label="Precision (px)", value=64, minimum=4, maximum=128, step=4, precision=0, render=False)
 
         with gr.Accordion(label="Aspect Ratio and Resolution Buttons", open=True):
@@ -270,11 +331,15 @@ class AspectRatioScript(scripts.Script):
 
                     # Lock button
                     arc_lock = ToolButton(value=self.LOCK_OPEN_ICON, visible=True, variant="secondary", elem_id="arsp__arc_lock_button")
-                    # Click event handling for lock button
+                    # Lock button click event handling
                     def toggle_lock(icon, avg, w=512, h=512):
-                        icon = self.LOCK_OPEN_ICON if ARButton.is_locked else self.LOCK_CLOSED_ICON
-                        ARButton.toggle_lock()
-                        ResButton.toggle_lock()
+                        icon = self.LOCK_OPEN_ICON if (img2imgARButtons.is_locked if is_img2img else txt2imgARButtons.is_locked) else self.LOCK_CLOSED_ICON
+                        if is_img2img:
+                            img2imgARButtons.toggle_lock()
+                            img2imgResButtons.toggle_lock()
+                        else:
+                            txt2imgARButtons.toggle_lock()
+                            txt2imgResButtons.toggle_lock()
                         if not avg:
                             avg = avg_from_dims(w, h)
                         return icon, avg
@@ -284,14 +349,15 @@ class AspectRatioScript(scripts.Script):
                     else:
                         lock_w = self.t2i_w
                         lock_h = self.t2i_h
+                    # Lock button event listener
                     arc_lock.click(toggle_lock, inputs=[arc_lock, arc_avg, lock_w, lock_h], outputs=[arc_lock, arc_avg])
 
                     # Initialize Aspect Ratio buttons (render=False)
-                    ar_btns = [ARButton(value=ar, render=False) for ar in self.ar_btns_labels]
+                    ar_btns = [img2imgARButtons(value=ar, render=False) if is_img2img else txt2imgARButtons(value=ar, render=False) for ar in self.ar_btns_labels]
 
                     # Switch button
                     arc_sw = ToolButton(value=self.LAND_AR_ICON, visible=True, variant="secondary", elem_id="arsp__arc_sw_button")
-                    # Click event handling for switch button
+                    # Switch button click event handling
                     def toggle_switch(*items, **kwargs):
                         ar_icons = items[:-1]
                         sw_icon = items[-1]  
@@ -300,16 +366,18 @@ class AspectRatioScript(scripts.Script):
                         else:
                             ar_icons = tuple(self.aspect_ratios)
                         sw_icon = self.PORT_AR_ICON if sw_icon == self.LAND_AR_ICON else self.LAND_AR_ICON
-                        ARButton.toggle_switch()
+                        if is_img2img:
+                            img2imgARButtons.toggle_switch()
+                        else:
+                            txt2imgARButtons.toggle_switch()
                         return (*ar_icons, sw_icon)
-
+                    # Switch button event listener
                     arc_sw.click(toggle_switch, inputs=ar_btns+[arc_sw], outputs=ar_btns+[arc_sw])
 
-                    # Render the Aspect Ratio buttons
+                    # AR buttons render
                     for b in ar_btns:
                         b.render()
-
-                    # Click event handling for AR buttons
+                    # AR buttons click event handling
                     with contextlib.suppress(AttributeError):
                         for b in ar_btns:
                             if is_img2img:
@@ -318,10 +386,10 @@ class AspectRatioScript(scripts.Script):
                             else:
                                 w = self.t2i_w
                                 h = self.t2i_h  
-                                                    
+                            # AR buttons event listener
                             b.click(b.apply, inputs=[arc_avg, arc_prec, w, h], outputs=[arc_avg, w, h])
 
-                # Get resolutions from file
+                # Get static resolutions from file
                 self.read_resolutions()
 
                 # Bottom row
@@ -330,21 +398,25 @@ class AspectRatioScript(scripts.Script):
                     # Info button to toggle info window
                     arc_show_info = ToolButton(value=self.INFO_ICON, visible=True, variant="secondary", elem_id="arsp__arc_show_info_button")
                     arc_hide_info = ToolButton(value=self.INFO_CLOSE_ICON, visible=False, variant="secondary", elem_id="arsp__arc_hide_info_button")
-                    # Click event handling for info window
-                    # Handled after everything else
+                    ### Click event handling for info window ###
+                    ##### is defined after everything else #####
 
                     # Mode button
                     arc_mode = ToolButton(value=self.OFFSET_ICON, visible=True, variant="secondary", elem_id="arsp__arc_mode_button")
-                    # Click event handling for Mode button
+                    # Mode button click event handling
                     def toggle_mode(icon):
                         icon = self.ONE_DIM_ICON if icon == self.OFFSET_ICON else self.OFFSET_ICON
-                        ARButton.toggle_mode()
+                        if is_img2img:
+                            img2imgARButtons.toggle_mode()
+                        else:
+                            txt2imgARButtons.toggle_mode()
                         return icon
+                    # Mode button event listener
                     arc_mode.click(toggle_mode, inputs=[arc_mode], outputs=[arc_mode])
 
-                    # Static resolution buttons
-                    btns = [ResButton(res=res, value=label) for res, label in zip(self.res, self.res_labels)]
-                    # Click event handling for static res buttons
+                    # Static res buttons
+                    btns = [img2imgResButtons(res=res, value=label) if is_img2img else txt2imgResButtons(res=res, value=label) for res, label in zip(self.res, self.res_labels)]
+                    # Static res buttons event listener
                     with contextlib.suppress(AttributeError):
                         for b in btns:
                             b.click(b.reset, inputs=[arc_avg], outputs=[arc_avg, w, h])
@@ -358,10 +430,11 @@ class AspectRatioScript(scripts.Script):
                 with gr.Column(visible=False, variant="panel", elem_id="arsp__arc_panel") as arc_panel:
                     with gr.Row():
                         with gr.Column(scale=2, min_width=100):
-                            # render the current average number box
+
+                            # Average number box render
                             arc_avg.render()
 
-                            # render the precision input box
+                            # Precision input box render
                             arc_prec.render()
 
                         # Information blurb
@@ -380,7 +453,7 @@ class AspectRatioScript(scripts.Script):
                             '''
                             )
 
-                # Toggle info panel
+                # Info panel event listeners
                 arc_show_info.click(
                     lambda: [
                         gr.update(visible=True),
@@ -394,7 +467,6 @@ class AspectRatioScript(scripts.Script):
                         arc_hide_info,
                     ],
                 )
-                # Hide info pane
                 arc_hide_info.click(
                     lambda: [
                         gr.update(visible=False),
