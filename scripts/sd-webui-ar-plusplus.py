@@ -180,6 +180,12 @@ class img2imgResButtons(ToolButton):
     def toggle_lock(cls):
         cls.is_locked = not cls.is_locked
 
+# Hack for Gradio 4.0; see `get_component_class_id` in `venv/lib/site-packages/gradio/components/base.py`
+txt2imgARButtons.__module__ = "modules.ui_components"
+img2imgARButtons.__module__ = "modules.ui_components"
+txt2imgResButtons.__module__ = "modules.ui_components"
+img2imgResButtons.__module__ = "modules.ui_components"
+
 # Get values for Aspect Ratios from file
 def parse_aspect_ratios_file(filename):
     values, flipvals, comments = [], [], []
