@@ -22,7 +22,7 @@
 
 button#arsp__arc_lock_button,
 button#arsp__arc_mode_button,
-button#arsp__arc_sw_button,
+button#arsp__arc_switch_button,
 button#arsp__arc_show_info_button,
 button#arsp__arc_hide_info_button {
 	max-width: 40px !important;
